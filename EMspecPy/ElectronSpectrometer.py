@@ -1,17 +1,36 @@
-import ParticlePusher3D as pp3d
+from . import particle_pusher as pp3d
 import numpy as np
 import matplotlib
-import scipy.constants as C
-# matplotlib notebook
+from scipy.constants import c, m_e, e
+
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-from general_tools import imagesc
 
+import matplotlib, os
+import matplotlib.font_manager
+from matplotlib import rcParams
 
+rcParams['font.family'] = 'serif'
+rcParams['font.serif'] = 'Times'
+rcParams['font.sans-serif'] = 'Helvetica'
+rcParams['font.cursive'] = 'Zapf Chancery'
+rcParams['font.monospace'] = 'Computer Modern Typewriter'
 
+font_size = 7
+rcParams['axes.labelsize'] = font_size
+rcParams['axes.titlesize'] = font_size
+rcParams['xtick.labelsize'] = font_size
+rcParams['ytick.labelsize'] = font_size
+rcParams['axes.titlesize'] = font_size
+rcParams['font.size'] = font_size
+rcParams['text.usetex'] = 'false'
+rcParams['text.latex.preamble']=r"\usepackage{amsmath}"
+
+rcParams['axes.linewidth']= 0.5
+rcParams['lines.linewidth']= 1.0
 
 class Espec:
-    def __init__(self,N_g=100,N_a=5,N_t=1,g_min=10,g_max=10000,div_mrad=10,q=-1):
+    def __init__(self,N_g=100,N_a=5,N_t=1,g_min=10,g_max=10000,div_mrad=10,q=-1,m=1):
         self.N_g = N_g
         self.N_a = N_a
         self.N_t = N_t
@@ -21,6 +40,7 @@ class Espec:
         self.N_MeV = 1000 # number of points on electron energy axis
         self.p_6d_0 = None
         self.q = q # -1 for electrons
+        self.m = m # 1 for electrons 1836.15 for protons
 
     def plotTracks(self,ax=None,plot_Bfield=True,plot_cbar=True):
         xLims = self.xLims
@@ -36,10 +56,14 @@ class Espec:
         E_vec, B_vec =  self.EM_function(0,XYZ)
         B_img = np.reshape(B_vec[2,:],(Ny_img,Nx_img))
         if ax is None:
-            fig = plt.figure()
+            fig = plt.figure(figsize = (16/2.54,5/2.54),dpi=150)
             ax = plt.axes()
         if plot_Bfield:
-            ih = imagesc(B_img,x=x_img,y=y_img,ax=ax,cmap='gray',vmin=-1.6)
+            if np.abs(np.max(B_img))>np.abs(np.min(B_img)): 
+                cmap = 'gray_r'
+            else:
+                cmap = 'gray'
+            ih = ax.pcolormesh(x_img,y_img,B_img,cmap=cmap,vmin=np.min(B_img),vmax=np.max(B_img),shading='auto')
         if plot_cbar:
             if plot_Bfield:
                 cbh = plt.colorbar(ih,ax=ax)
@@ -51,7 +75,8 @@ class Espec:
         if self.screens is not None:
             for dS in self.screens:
                 ax.plot((dS['origin'][0],dS['end'][0]),(dS['origin'][1],dS['end'][1]),'b-')
-
+        ax.set_xlim(*xLims[0])
+        ax.set_ylim(*xLims[1])
         ax.set_xlabel(r'$x$ [m]')
         ax.set_ylabel(r'$y$ [m]')
         return ax, cbh
@@ -130,9 +155,10 @@ class Espec:
 
             iSel= np.isfinite(x_mean)
             b = np.sqrt(1-1./g[iSel]**2)
-            E_x = interp1d(x_mean[iSel],g[iSel]*b*0.511,kind='cubic',bounds_error=False)
-            E_x_min = interp1d(x_min[iSel],g[iSel]*b*0.511,kind='cubic',bounds_error=False)
-            E_x_max = interp1d(x_max[iSel],g[iSel]*b*0.511,kind='cubic',bounds_error=False)
+            E = (g[iSel]-1)*self.m*m_e*c**2/e/1e6
+            E_x = interp1d(x_mean[iSel],E,kind='cubic',bounds_error=False)
+            E_x_min = interp1d(x_min[iSel],E,kind='cubic',bounds_error=False)
+            E_x_max = interp1d(x_max[iSel],E,kind='cubic',bounds_error=False)
             
             spec_MeV = E_x(spec_x)
             spec_MeV_min = E_x_min(spec_x)
@@ -142,7 +168,7 @@ class Espec:
             screen_b = np.sqrt(1-1./screen_g**2)
             dS['screen_x'] = screen_x
             dS['screen_y'] = screen_y
-            dS['screen_E'] = screen_g*0.511*screen_b
+            dS['screen_E'] = (screen_g-1)*self.m*m_e*c**2/e/1e6
             dS['screen_eAng'] = screen_eAng
             dS['spec_x_mm'] = spec_x*1e3
             dS['spec_eAng'] = spec_eAng
@@ -151,22 +177,23 @@ class Espec:
             dS['spec_MeV_max'] = spec_MeV_max
             dS['spec_MeV_per_mm'] = np.gradient(spec_MeV)/np.gradient(spec_x*1e3)
             dS['spec_percentage_err'] = (spec_MeV_max-spec_MeV_min)/(2*spec_MeV)*100
-            
-            plt.figure(figsize=(16,3))
-            plt.subplot(1,3,1)
-            plt.plot(dS['spec_x_mm'],dS['spec_MeV'],'k-')
-            plt.fill_between(dS['spec_x_mm'],dS['spec_MeV_min'],dS['spec_MeV_max'],alpha=0.3,color='k')
-            plt.xlabel('Screen position [mm]')
-            plt.ylabel('Energy [MeV]')
-            plt.title(dS['label'])
-            plt.subplot(1,3,2)
-            plt.plot(dS['spec_MeV'],dS['spec_MeV_per_mm'])
-            plt.xlabel('Energy [MeV]')
-            plt.ylabel('Dispersion [MeV/mm]')
-            plt.subplot(1,3,3)
-            plt.plot(dS['spec_MeV'],dS['spec_percentage_err'])
-            plt.xlabel('Energy [MeV]')
-            plt.ylabel(r'Energy error $\pm$ [$\%$]')
+            if self.plot_tracks:
+                fig,axs = plt.subplots(1,3,figsize=(16/2.54,3/2.54),dpi=150)
+                plt.subplots_adjust(wspace=0.3)
+
+                axs[0].plot(dS['spec_x_mm'],dS['spec_MeV'],'k-')
+                axs[0].fill_between(dS['spec_x_mm'],dS['spec_MeV_min'],dS['spec_MeV_max'],alpha=0.3,color='k')
+                axs[0].set_xlabel('Screen position [mm]')
+                axs[0].set_ylabel('Energy [MeV]')
+                axs[0].set_title(dS['label'])
+                axs[1].plot(dS['spec_MeV'],dS['spec_MeV_per_mm'])
+                axs[1].set_xlabel('Energy [MeV]')
+                axs[1].set_ylabel('Dispersion [MeV/mm]')
+
+                axs[2].plot(dS['spec_MeV'],dS['spec_percentage_err'])
+                axs[2].set_xlabel('Energy [MeV]')
+                axs[2].set_ylabel(r'Energy error $\pm$ [$\%$]')
+                plt.show()
 
     def initialise_particles(self):
         N_p = self.N_g*self.N_a*self.N_t
@@ -177,16 +204,17 @@ class Espec:
         [A,G,T] = np.meshgrid(a,g,t)
         self.G = G
         T[:,0,:] = 0
-        # b = np.sqrt(1-1./G.flatten())
+        b = np.sqrt(1-1./G.flatten())
 
         p_6d_0 = np.zeros((6,N_p))
-        p_6d_0[3,:] = G.flatten()*np.sqrt(1-(np.sin(T.flatten()))**2)
-        p_6d_0[4,:] = G.flatten()*np.sin(T.flatten())*np.sin(A.flatten())
-        p_6d_0[5,:] = G.flatten()*np.sin(T.flatten())*np.cos(A.flatten())
+        p_6d_0[3,:] = b*G.flatten()*np.sqrt(1-(np.sin(T.flatten()))**2)
+        p_6d_0[4,:] = b*G.flatten()*np.sin(T.flatten())*np.sin(A.flatten())
+        p_6d_0[5,:] = b*G.flatten()*np.sin(T.flatten())*np.cos(A.flatten())
         self.p_6d_0 = p_6d_0
         return p_6d_0
 
     def modelSpectrometer(self,EM_function,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,plot_tracks=True):
+        self.plot_tracks=plot_tracks
         self.screens = screens
         self.EM_function = EM_function
         self.xLims=xLims
@@ -194,9 +222,10 @@ class Espec:
         if self.p_6d_0 is None:
             self.initialise_particles()
 
-        
+        b  = np.sqrt(1-1/self.G**2)
 
-        P_tracker = pp3d.ParticlePushObj(self.p_6d_0,EM_function,dtMin=0,dtMax=dx/3e8,ppc=32,q=self.q,m=1)
+        v_max = np.max(b)*c
+        P_tracker = pp3d.ParticlePusher(self.p_6d_0,EM_function,dtMin=0,dtMax=dx/v_max,ppc=32,q=self.q,m=self.m)
         self.t,self.p_6d_t = P_tracker.trackParticles(xLims=self.xLims,pLims=pLims,N_max=N_max)
         if plot_tracks:
             self.plotTracks()

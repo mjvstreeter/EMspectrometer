@@ -1,9 +1,8 @@
 import numpy as np
-from scipy.constants import c, m_e
-from scipy.constants import e as q_e
+from scipy.constants import c, m_e, e
 np.seterr(divide='ignore')
 
-class ParticlePushObj:
+class ParticlePusher:
     
     def __init__(self,p_6d,EM_function,dtMin=0,dtMax=1,ppc=16,q=-1,m=1,pushMethod='boris'):
         self.p_6d =  p_6d
@@ -60,7 +59,7 @@ class ParticlePushObj:
         ''' Tracks particles using the Boris push method
         '''
         p_m = self.m*m_e
-        p_q = self.q*q_e
+        p_q = self.q*e
         rqm = p_m/p_q
         p_x = self.p_6d[0:3,:]
         p_px = self.p_6d[3:6,:]
