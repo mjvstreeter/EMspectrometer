@@ -1,33 +1,13 @@
 from . import particle_pusher as pp3d
 import numpy as np
-import matplotlib
 from scipy.constants import c, m_e, e
 
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
 import matplotlib, os
-import matplotlib.font_manager
-from matplotlib import rcParams
 
-rcParams['font.family'] = 'serif'
-rcParams['font.serif'] = 'Times'
-rcParams['font.sans-serif'] = 'Helvetica'
-rcParams['font.cursive'] = 'Zapf Chancery'
-rcParams['font.monospace'] = 'Computer Modern Typewriter'
 
-font_size = 7
-rcParams['axes.labelsize'] = font_size
-rcParams['axes.titlesize'] = font_size
-rcParams['xtick.labelsize'] = font_size
-rcParams['ytick.labelsize'] = font_size
-rcParams['axes.titlesize'] = font_size
-rcParams['font.size'] = font_size
-rcParams['text.usetex'] = 'false'
-rcParams['text.latex.preamble']=r"\usepackage{amsmath}"
-
-rcParams['axes.linewidth']= 0.5
-rcParams['lines.linewidth']= 1.0
 
 class Espec:
     def __init__(self,N_g=100,N_a=5,N_t=1,g_min=10,g_max=10000,div_mrad=10,q=-1,m=1):

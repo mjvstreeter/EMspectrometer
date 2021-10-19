@@ -6,7 +6,7 @@ from scipy.ndimage import median_filter, percentile_filter
 from scipy.io import loadmat
 from scipy.interpolate import interp1d, RectBivariateSpline
 
-from Positrons2021.general_tools import load_object
+from general_tools import load_object
 def iXon_footprint(Nx=21,Ny=21):
   
     X,Y = np.meshgrid(np.arange(Ny)-(Ny-1)/2,np.arange(Nx)-(Nx-1)/2)
