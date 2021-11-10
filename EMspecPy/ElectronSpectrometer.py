@@ -1,7 +1,7 @@
 from . import particle_pusher as pp3d
 import numpy as np
 from scipy.constants import c, m_e, e
-
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
@@ -212,3 +212,28 @@ class Espec:
         if screens is not None:
             self.findScreenParticles()
 
+def load_radia_field(file_path):
+    ''' inputs: file_path  path to csv file save by radia
+            csv file has 6 headings and then a list of positions and fields
+            
+        returns: x,y,z positions in mm
+                 Bx,By,Bz field in T
+                 field data is shaped into 3D arrays
+                 x,y,z axes are 1D arrays along dimensions 0,1,2 respectively
+            '''
+    df = pd.read_csv(file_path)
+    Nx = len(np.unique(df['x'].values))
+    Ny = len(np.unique(df['y'].values))
+    Nz = len(np.unique(df['z'].values))
+        
+    X = np.reshape(df['x'].values,[Nx,Ny,Nz])
+    Y = np.reshape(df['y'].values,[Nx,Ny,Nz])
+    Z = np.reshape(df['z'].values,[Nx,Ny,Nz])
+    Bx = np.reshape(df['Bx'].values,[Nx,Ny,Nz])
+    By = np.reshape(df['By'].values,[Nx,Ny,Nz])
+    Bz = np.reshape(df['Bz'].values,[Nx,Ny,Nz])
+
+    x = X[:,0,0]
+    y = Y[0,:,0]
+    z = Z[0,0,:]
+    return x,y,z,Bx,By,Bz
