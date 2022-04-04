@@ -110,6 +110,12 @@ class Espec:
                     screen_y.append(np.dot(p_0-d_o,d_y_vec))
                     screen_g.append(G.flatten()[n])
                     screen_eAng.append(np.arccos(np.dot(v_0,screenNormal)))
+                else:
+                    screen_x.append(np.nan)
+                    screen_y.append(np.nan)
+                    screen_g.append(np.nan)
+                    screen_eAng.append(np.nan)
+
             screen_x = np.array(screen_x)
             screen_y = np.array(screen_y)   
             screen_g = np.array(screen_g) 
