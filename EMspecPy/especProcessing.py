@@ -83,10 +83,10 @@ class Espec_proc():
         self.dE_MeV = np.mean(np.diff(self.eAxis_MeV))
         
 
-    def img_warp(self,img_raw):
+    def img_warp(self,img):
         """ calc transformed image using tForm file and cv2 perspective transform
         """ 
-        img = self.background_sub(img_raw)
+        
 
         with np.errstate(divide='ignore'):
             with np.errstate(invalid='ignore'):
@@ -95,9 +95,12 @@ class Espec_proc():
         imgCountsPerArea[np.isinf(imgCountsPerArea)] = 0
         imgCountsPerArea[np.isnan(imgCountsPerArea)] = 0
 
-        im_out = cv2.warpPerspective(imgCountsPerArea, self.H, self.newImgSize)*self.imgArea1
+        im_out = self._img_transform(imgCountsPerArea)*self.imgArea1
         return im_out
 
+    def _img_transform(self,img):
+        return cv2.warpPerspective(img, self.H, self.newImgSize)
+        
     def file2screen(self,file_path):
         """ Takes a data file and returns the screen signal (using perspective transform)
         should be in real units of pC per mm^2
@@ -110,7 +113,8 @@ class Espec_proc():
         """ Takes raw data (previous opened from data file) and returns the screen signal (using perspective transform)
         should be in real units of pC per mm^2
         """
-        img_warp= self.espec_warp(img_raw.astype(float))
+        img = self.background_sub(img_raw.astype(float))
+        img_warp= self.img_warp(img)
         img_pC_permm2 = img_warp*self.fC_per_count/self.imgArea1 *1e-3
         return img_pC_permm2
 
@@ -235,7 +239,7 @@ class Espec_ang_proc():
         self.dE_MeV = np.mean(np.diff(self.eAxis_MeV))
         
 
-    def espec_warp(self,img_raw):
+    def img_warp(self,img_raw):
         """ calc transformed image using tForm file and cv2 perspective transform
         """ 
         img = self.background_sub(img_raw)
@@ -267,7 +271,7 @@ class Espec_ang_proc():
         should be in real units of pC per mm^2
         """
 
-        img_warp= self.espec_warp(img_raw)
+        img_warp= self.img_warp(img_raw)
         img_pC_permm2 = img_warp*self.fC_per_count/self.imgArea1 *1e-3
         return img_pC_permm2
 
