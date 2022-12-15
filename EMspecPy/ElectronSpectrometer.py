@@ -185,16 +185,16 @@ class Espec:
         N_p = self.N_g*self.N_a*self.N_t
         g = 10**np.linspace(np.log10(self.g_min),np.log10(self.g_max),num=self.N_g,endpoint=True)
         self.g=g
-        a = np.linspace(0,2*np.pi,num=self.N_a,endpoint=False)
+        a = np.linspace(0,2*np.pi,num=self.N_a,endpoint=True)
         t = np.linspace(self.div_mrad*1e-3,0,self.N_t+1)[:-1]
-        [A,G,T] = np.meshgrid(a,g,t)
+        A,G,T = np.meshgrid(a,g,t)
         # fix at some point - there are multiple particles on zero
         # A = np.append(np.zeros_like(g),A.flatten())
         # A = np.append(np.zeros_like(g),A.flatten())
         # A = np.append(np.zeros_like(g),A.flatten())
         self.G = G
         T[:,0,:] = 0
-        b = np.sqrt(1-1./G.flatten())
+        b = np.sqrt(1-1./G.flatten()**2)
 
         p_6d_0 = np.zeros((6,N_p))
         p_6d_0[3,:] = b*G.flatten()*np.sqrt(1-(np.sin(T.flatten()))**2)
