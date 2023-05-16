@@ -75,7 +75,7 @@ class Espec:
             d_x_vec = (d_e-d_o)/np.linalg.norm(d_e-d_o)
             d_y_vec = (d_s-d_o)/np.linalg.norm(d_s-d_o)
             l = np.linalg.norm(d_e-d_o)
-            spec_x = np.linspace(0,l,num=self.N_MeV,endpoint=True)
+
             screenNormal = np.cross(d_x_vec,d_y_vec)
             screenNormal = np.expand_dims(screenNormal,1)
             screenNormal = screenNormal/np.linalg.norm(screenNormal)
@@ -120,6 +120,26 @@ class Espec:
             screen_y = np.array(screen_y)   
             screen_g = np.array(screen_g) 
             screen_eAng = np.array(screen_eAng)
+
+            dS['screen_x'] = screen_x
+            dS['screen_y'] = screen_y
+            dS['screen_g'] = screen_g
+            dS['screen_E'] = (screen_g-1)*self.m*m_e*c**2/e/1e6
+            dS['screen_eAng'] = screen_eAng
+
+
+    def calc_dispersion(self):
+            
+        for dS in self.screens:
+            d_o = dS['origin']
+            d_e = dS['end']
+            d_s = dS['side']
+            d_x_vec = (d_e-d_o)/np.linalg.norm(d_e-d_o)
+            d_y_vec = (d_s-d_o)/np.linalg.norm(d_s-d_o)
+            l = np.linalg.norm(d_e-d_o)
+            spec_x = np.linspace(0,l,num=self.N_MeV,endpoint=True)
+
+            N_g = self.N_g 
             x_mean = np.zeros(N_g)
             e_ang_mean = np.zeros(N_g)
             x_rms = np.zeros(N_g)
@@ -127,21 +147,21 @@ class Espec:
             x_max = np.zeros(N_g)
             
             for n in range(N_g):
-                g_sel = screen_g==g[n]
+                g_sel = dS['screen_g'] ==self.g[n]
                 if np.any(g_sel):
-                    x_sel = screen_x[g_sel]
+                    x_sel = dS['screen_x'][g_sel]
                     x_mean[n] = np.mean(x_sel)
                     x_rms[n] = np.sqrt(np.mean((x_sel - x_mean[n])**2))
                     x_min[n] = np.min(x_sel)
                     x_max[n] = np.max(x_sel)
-                    e_ang_mean[n] = np.mean(screen_eAng[g_sel])
+                    e_ang_mean[n] = np.mean(dS['screen_eAng'][g_sel])
                 else:
                     x_mean[n]= np.nan
             
 
             iSel= np.isfinite(x_mean)
-            b = np.sqrt(1-1./g[iSel]**2)
-            E = (g[iSel]-1)*self.m*m_e*c**2/e/1e6
+            b = np.sqrt(1-1./self.g[iSel]**2)
+            E = (self.g[iSel]-1)*self.m*m_e*c**2/e/1e6
             E_x = interp1d(x_mean[iSel],E,kind='cubic',bounds_error=False)
             E_x_min = interp1d(x_min[iSel],E,kind='cubic',bounds_error=False)
             E_x_max = interp1d(x_max[iSel],E,kind='cubic',bounds_error=False)
@@ -151,11 +171,8 @@ class Espec:
             spec_MeV_max = E_x_max(spec_x)
             spec_eAng = interp1d(x_mean[iSel],e_ang_mean[iSel],
                                  kind='cubic',bounds_error=False)(spec_x)
-            screen_b = np.sqrt(1-1./screen_g**2)
-            dS['screen_x'] = screen_x
-            dS['screen_y'] = screen_y
-            dS['screen_E'] = (screen_g-1)*self.m*m_e*c**2/e/1e6
-            dS['screen_eAng'] = screen_eAng
+            screen_b = np.sqrt(1-1./dS['screen_g']**2)
+            
             dS['spec_x_mm'] = spec_x*1e3
             dS['spec_eAng'] = spec_eAng
             dS['spec_MeV'] = spec_MeV
@@ -203,7 +220,8 @@ class Espec:
         self.p_6d_0 = p_6d_0
         return p_6d_0
 
-    def modelSpectrometer(self,EM_function,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,plot_tracks=True):
+    def modelSpectrometer(self,EM_function,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,
+                          calc_dispersion = True, plot_tracks=True):
         self.plot_tracks=plot_tracks
         self.screens = screens
         self.EM_function = EM_function
@@ -221,6 +239,8 @@ class Espec:
             self.plotTracks()
         if screens is not None:
             self.findScreenParticles()
+        if calc_dispersion:
+            self.calc_dispersion()
 
 def load_radia_field(file_path):
     ''' inputs: file_path  path to csv file save by radia
