@@ -4,19 +4,20 @@ from scipy.constants import c, m_e, e
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from .general_tools import circular_pattern
 
 import matplotlib, os
 
-
+def g2b(g):
+    return np.sqrt(1-1./g**2)
+def b2g(b):
+    return 1/np.sqrt(1-b**2)
 
 class Espec:
-    def __init__(self,N_g=100,N_a=5,N_t=1,g_min=10,g_max=10000,div_mrad=10,q=-1,m=1):
-        self.N_g = N_g
-        self.N_a = N_a
-        self.N_t = N_t
-        self.g_min = g_min
-        self.g_max = g_max
-        self.div_mrad = div_mrad
+    ''' Class for modelling an electro-magnetic spectrometer. 
+            Calculates particle trajectories and can return intersections of particles with detector planes and calculate dispersion function (with angular dependance)
+    '''
+    def __init__(self,q=-1,m=1):
         self.N_MeV = 1000 # number of points on electron energy axis
         self.p_6d_0 = None
         self.q = q # -1 for electrons
@@ -198,26 +199,61 @@ class Espec:
                 axs[2].set_ylabel(r'Energy error $\pm$ [$\%$]')
                 plt.show()
 
-    def initialise_particles(self):
-        N_p = self.N_g*self.N_a*self.N_t
-        g = 10**np.linspace(np.log10(self.g_min),np.log10(self.g_max),num=self.N_g,endpoint=True)
-        self.g=g
-        a = np.linspace(0,2*np.pi,num=self.N_a,endpoint=True)
-        t = np.linspace(self.div_mrad*1e-3,0,self.N_t+1)[:-1]
-        A,G,T = np.meshgrid(a,g,t)
-        # fix at some point - there are multiple particles on zero
-        # A = np.append(np.zeros_like(g),A.flatten())
-        # A = np.append(np.zeros_like(g),A.flatten())
-        # A = np.append(np.zeros_like(g),A.flatten())
-        self.G = G
-        T[:,0,:] = 0
-        b = np.sqrt(1-1./G.flatten()**2)
+    def initialise_particles(self,N_g=51,N_t=11 ,N_phi=1, dist_type='fan',
+                             g_lims = [50,4000], div_mrad = 10, phi =  0):
+        ''' Initialises a particle distribution for tracking through the spectrometer
+                N_g (=51) is the number of distinct particle energies to use
+                N_t (=11) is the number of angles polar angles to use
+                N_phi (=1) is the number of azimuthal angles to use. If type='fan' then this is ignored as only one azimuthal angles is used.
+                type='fan' is beam type either 'fan' or 'beam'
+                g_lims =[50,4000] maximum and minimum gamma factor for the beam
+                div_mrad =10 is the maximum divergence of the beam in mrad
+                phi= 0 orientation of beam for fan mode. 0 means beam will be in x-y plane
 
+            returns
+                initial beam distribution with dimensions [6,N_p] where N_p is number of particles
+                    elements are [x,y,z,px,py,pz] with x,y,z are positions in meters and px,py,pz are momenta normalised to m*c
+
+        '''
+        assert dist_type.lower() in ['fan','beam']
+        # initialise particle energies (log-spaced)
+        g = np.logspace(np.log10(g_lims[0]),np.log10(g_lims[1]),num=N_g,endpoint=True)
+        if dist_type == 'fan':
+            N_phi=1 # if beam type is fan, then there is only one azimuthal angle
+            t = np.linspace(-div_mrad*1e-3,div_mrad*1e-3,self.N_t,endpoint=True)
+            P,G,T = np.meshgrid(phi,g,t)
+            b = g2b(G.flatten())
+            px = b*G.flatten()*np.sqrt(1-(np.sin(T.flatten()))**2)
+            py = b*G.flatten()*np.sin(T.flatten())*np.sin(P.flatten())
+            pz = b*G.flatten()*np.sin(T.flatten())*np.cos(P.flatten())
+            N_a = N_t # number of angles (number of particles per energy slice)
+
+        elif dist_type =='beam':
+            # code for evenly distributing points over the area of a circle
+            y_dash,z_dash =  circular_pattern(N_t*N_phi,R=div_mrad)
+            N_a = len(y_dash) # number of angles
+            YD,G = np.meshgrid(y_dash,g)
+            ZD,G = np.meshgrid(z_dash,g)
+            r_dash = np.sqrt(Y**2+ZD**2).flatten()
+            px = b*G.flatten()*np.sqrt(1-r_dash**2)
+            py = b*G.flatten()*YD.flatten()
+            pz = b*G.flatten()*ZD.flatten()
+
+
+        N_p = len(G.flatten())# total number of particles
+        # build particle distribution
         p_6d_0 = np.zeros((6,N_p))
-        p_6d_0[3,:] = b*G.flatten()*np.sqrt(1-(np.sin(T.flatten()))**2)
-        p_6d_0[4,:] = b*G.flatten()*np.sin(T.flatten())*np.sin(A.flatten())
-        p_6d_0[5,:] = b*G.flatten()*np.sin(T.flatten())*np.cos(A.flatten())
+        p_6d_0[3,:] = px
+        p_6d_0[4,:] = py
+        p_6d_0[5,:] = pz
+
         self.p_6d_0 = p_6d_0
+        self.g=g
+        self.G = G
+        self.N_p = N_p
+        self.N_g = N_g
+        self.N_a = N_a
+
         return p_6d_0
 
     def modelSpectrometer(self,EM_function,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,
