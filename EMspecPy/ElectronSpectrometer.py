@@ -25,7 +25,7 @@ class Espec:
 
     def plotTracks(self,ax=None,plot_Bfield=True,plot_cbar=True):
         xLims = self.xLims
-        N_p = self.N_g*self.N_a*self.N_t
+        N_p = self.N_p
         Nx_img= 1000
         Ny_img = 500
         x_img =np.linspace(xLims[0][0],xLims[0][1],num=Nx_img)
@@ -50,7 +50,7 @@ class Espec:
                 cbh = plt.colorbar(ih,ax=ax)
         else:
             cbh = None
-        pSel = range(0,N_p,self.N_t*self.N_a)
+        pSel = range(0,N_p,int(N_p/self.N_g))
         for p_ind in pSel:
             ax.plot(self.p_6d_t[:,0,p_ind],self.p_6d_t[:,1,p_ind],'r-',alpha=0.3)
         if self.screens is not None:
@@ -68,7 +68,7 @@ class Espec:
         g = self.g
         G = self.G
         t = self.t
-        N_p = self.N_g*self.N_a*self.N_t
+        N_p = self.N_p
         for dS in self.screens:
             d_o = dS['origin']
             d_e = dS['end']
@@ -110,13 +110,12 @@ class Espec:
                     screen_x.append(np.dot(p_0-d_o,d_x_vec))
                     screen_y.append(np.dot(p_0-d_o,d_y_vec))
                     screen_g.append(G.flatten()[n])
-                    screen_eAng.append(np.arccos(np.dot(v_0,screenNormal)))
+                    screen_eAng.append(np.arccos(np.dot(v_0,screenNormal.flatten())))
                 else:
                     screen_x.append(np.nan)
                     screen_y.append(np.nan)
                     screen_g.append(np.nan)
                     screen_eAng.append(np.nan)
-
             screen_x = np.array(screen_x)
             screen_y = np.array(screen_y)   
             screen_g = np.array(screen_g) 
@@ -220,7 +219,7 @@ class Espec:
         g = np.logspace(np.log10(g_lims[0]),np.log10(g_lims[1]),num=N_g,endpoint=True)
         if dist_type == 'fan':
             N_phi=1 # if beam type is fan, then there is only one azimuthal angle
-            t = np.linspace(-div_mrad*1e-3,div_mrad*1e-3,self.N_t,endpoint=True)
+            t = np.linspace(-div_mrad*1e-3,div_mrad*1e-3,N_t,endpoint=True)
             P,G,T = np.meshgrid(phi,g,t)
             b = g2b(G.flatten())
             px = b*G.flatten()*np.sqrt(1-(np.sin(T.flatten()))**2)
