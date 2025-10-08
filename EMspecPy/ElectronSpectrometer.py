@@ -252,6 +252,7 @@ class Espec:
         self.N_p = N_p
         self.N_g = N_g
         self.N_a = N_a
+        self.N_t = N_t
 
         return p_6d_0
 
