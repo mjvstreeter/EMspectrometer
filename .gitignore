@@ -1,2 +1,14 @@
 
 .DS_Store
+build/lib/EMspecPy/__init__.py
+build/lib/EMspecPy/ElectronSpectrometer.py
+build/lib/EMspecPy/especProcessing.py
+build/lib/EMspecPy/general_tools.py
+build/lib/EMspecPy/particle_pusher.py
+EMspecPy.egg-info/dependency_links.txt
+EMspecPy.egg-info/not-zip-safe
+EMspecPy.egg-info/PKG-INFO
+EMspecPy.egg-info/requires.txt
+EMspecPy.egg-info/SOURCES.txt
+EMspecPy.egg-info/top_level.txt
+EMspecPy/__pycache__/__init__.cpython-313.pyc
