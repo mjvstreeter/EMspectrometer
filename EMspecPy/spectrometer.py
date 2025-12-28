@@ -13,17 +13,18 @@ def g2b(g):
 def b2g(b):
     return 1/np.sqrt(1-b**2)
 
-class Espec:
+class EMspec:
     ''' Class for modelling an electro-magnetic spectrometer. 
             Calculates particle trajectories and can return intersections of particles with detector planes and calculate dispersion function (with angular dependance)
     '''
-    def __init__(self,q=-1,m=1):
+    def __init__(self,EM_function=None,q=-1,m=1):
         self.N_MeV = 1000 # number of points on electron energy axis
         self.p_6d_0 = None
         self.q = q # -1 for electrons
         self.m = m # 1 for electrons 1836.15 for protons
+        self.EM_function = EM_function
 
-    def plotTracks(self,ax=None,plot_Bfield=True,plot_cbar=True):
+    def plot_tracks(self,ax=None,plot_Bfield=True,plot_cbar=True):
         xLims = self.xLims
         N_p = self.N_p
         Nx_img= 1000
@@ -62,7 +63,7 @@ class Espec:
         ax.set_ylabel(r'$y$ [m]')
         return ax, cbh
 
-    def findScreenParticles(self):
+    def find_screen_particles(self):
         p_6d_t = self.p_6d_t
         N_g = self.N_g
         g = self.g
@@ -256,11 +257,10 @@ class Espec:
 
         return p_6d_0
 
-    def modelSpectrometer(self,EM_function,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,
-                          calc_dispersion = True, plot_tracks=True):
+    def model_spectrometer(self,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,calc_dispersion = True, plot_tracks=True):
         self.plot_tracks=plot_tracks
         self.screens = screens
-        self.EM_function = EM_function
+        
         self.xLims=xLims
         
         if self.p_6d_0 is None:
@@ -269,12 +269,12 @@ class Espec:
         b  = np.sqrt(1-1/self.G**2)
 
         v_max = np.max(b)*c
-        P_tracker = pp3d.ParticlePusher(self.p_6d_0,EM_function,dtMin=0,dtMax=dx/v_max,ppc=32,q=self.q,m=self.m)
-        self.t,self.p_6d_t = P_tracker.trackParticles(xLims=self.xLims,pLims=pLims,N_max=N_max)
+        P_tracker = pp3d.ParticlePusher(self.p_6d_0,self.EM_function,dtMin=0,dtMax=dx/v_max,ppc=32,q=self.q,m=self.m)
+        self.t,self.p_6d_t = P_tracker.track_particles(xLims=self.xLims,pLims=pLims,N_max=N_max)
         if plot_tracks:
-            self.plotTracks()
+            self.plot_tracks()
         if screens is not None:
-            self.findScreenParticles()
+            self.find_screen_particles()
         if calc_dispersion:
             self.calc_dispersion()
 

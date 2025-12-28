@@ -55,7 +55,7 @@ class ParticlePusher:
                     p_inside = np.logical_and(p_px[n,:]<=pLims[n][1],p_inside)
         return np.any(p_inside)
 
-    def trackParticles(self,xLims=[[None]*2]*3,pLims=[[None]*2]*3,N_max=10000):
+    def track_particles(self,xLims=[[None]*2]*3,pLims=[[None]*2]*3,N_max=10000):
         ''' Tracks particles using the Boris push method
         '''
         p_m = self.m*m_e
@@ -77,16 +77,7 @@ class ParticlePusher:
             dt = self._dt_calc(B_vec,gamma,rqm)
             t = t + dt
             t_list.append(t)
-            # offset velocity by -half step in first iteration
-            # if n==0:
-            #     dt = -dt/2
-            # else:
-            #     t = t + dt
-            # t_list.append(t)
-            # if n==0:
-            #     #p_x_dump, p_px = self._boris_step(p_x,p_px,rqm,dt,E_vec,B_vec)
-            #     p_x_dump, p_px = self._boris_step(p_x,p_px,rqm,dt,t)
-            # else:
+
             p_x, p_px = self._boris_step(p_x,p_px,rqm,dt,t)
             p_6d_t.append(np.concatenate((p_x,p_px),axis=0))
             keepTracking = self._check_tracking_conditions(p_x,p_px,xLims,pLims,n,N_max)
