@@ -92,11 +92,13 @@ Each screen dictionary is populated with:
 
 The dispersion is calculated from the mean screen position at each energy. It requires hits at two or more distinct energies and a monotonic position-energy calibration. If a screen has too few hits, EMspecPy emits a warning and stores NaN dispersion arrays. Values outside the calibrated screen-position range are also NaN rather than extrapolated.
 
+`dx` defines a time-step ceiling from the initial maximum particle speed. The step is also limited by the magnetic gyroperiod using `ppc` steps per period (default 32). For strongly accelerating particles, rapidly varying fields, or sharp field boundaries, reduce `dx`; choose it to resolve the physical field variation, not only the magnet geometry.
+
 `show_tracks=True` plots the x-y trajectories, field image, and dispersion summary. For custom figures, use `show_tracks=False` and call `spectrometer.plot_tracks()` or plot the arrays stored on each screen directly.
 
 ## Particle pusher choice
 
-`ParticlePusher` can be used directly from `EMspecPy.particle_pusher`. Its `pushMethod` accepts `"boris"` or `"boris_hc"` (also `"hc"` and `"higuera_cary"`). The latter applies the Higuera–Cary gamma correction to the relativistic magnetic rotation. The `EMspec.model_spectrometer()` convenience method currently uses the standard relativistic Boris method.
+`ParticlePusher` can be used directly from `EMspecPy.particle_pusher`. It always uses the Higuera–Cary relativistic rotation. This retains second-order accuracy and gives the correct relativistic E-cross-B drift in the crossed-field case; the paper also shows energy conservation when the electric field is zero. The method costs a little more computation than the standard Boris rotation, but there is no method-selection option in this package. See [Higuera and Cary (2017)](https://arxiv.org/abs/1701.05605) for the derivation and comparisons.
 
 ## Radia field grids
 

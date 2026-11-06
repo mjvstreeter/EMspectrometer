@@ -2,9 +2,9 @@ import numpy as np
 from scipy.constants import c, m_e, e
 
 class ParticlePusher:
-    """Relativistic particle pusher using normalized momentum and SI fields."""
+    """Relativistic Higuera–Cary pusher using normalized momentum and SI fields."""
 
-    def __init__(self,p_6d,EM_function,dtMin=0,dtMax=1,ppc=16,q=-1,m=1,pushMethod='boris'):
+    def __init__(self,p_6d,EM_function,dtMin=0,dtMax=1,ppc=16,q=-1,m=1):
         """Set up a pusher for positions in metres and momentum in units of m*c.
 
         ``EM_function(t, positions)`` must return electric and magnetic fields
@@ -17,10 +17,6 @@ class ParticlePusher:
         self.ppc=ppc
         self.q=q
         self.m=m
-        method = str(pushMethod).lower().replace('-', '_')
-        if method not in {'boris', 'hc', 'boris_hc', 'higuera_cary'}:
-            raise ValueError("pushMethod must be 'boris' or 'boris_hc'")
-        self.pushMethod = 'boris_hc' if method in {'hc', 'boris_hc', 'higuera_cary'} else 'boris'
     
     def _dt_calc(self,B_vec,gamma,rqm):
         """Choose a shared step from the shortest relativistic gyroperiod.
@@ -87,14 +83,26 @@ class ParticlePusher:
         p_6d = np.asarray(self.p_6d, dtype=float)
         if p_6d.ndim != 2 or p_6d.shape[0] != 6 or p_6d.shape[1] == 0:
             raise ValueError('p_6d must have shape (6, number_of_particles) with at least one particle')
+        if not np.all(np.isfinite([self.q, self.m, self.ppc, self.dtMin, self.dtMax])):
+            raise ValueError('q, m, ppc, dtMin, and dtMax must be finite')
         if self.q == 0 or self.m <= 0:
             raise ValueError('Particle charge must be non-zero and mass must be positive')
         if self.ppc <= 0 or self.dtMin < 0 or self.dtMax <= 0 or self.dtMin > self.dtMax:
             raise ValueError('Require ppc > 0 and 0 <= dtMin <= dtMax with dtMax > 0')
         if int(N_max) != N_max or N_max < 0:
             raise ValueError('N_max must be a non-negative integer')
+        if not np.all(np.isfinite(p_6d)):
+            raise ValueError('p_6d must contain only finite values')
         xLims = [[None, None] for _ in range(3)] if xLims is None else xLims
         pLims = [[None, None] for _ in range(3)] if pLims is None else pLims
+        for name, limits in (('xLims', xLims), ('pLims', pLims)):
+            if len(limits) != 3 or any(len(axis_limits) != 2 for axis_limits in limits):
+                raise ValueError(f'{name} must contain three (min, max) pairs')
+            for lower, upper in limits:
+                if (lower is not None and not np.isfinite(lower)) or (upper is not None and not np.isfinite(upper)):
+                    raise ValueError(f'{name} bounds must be finite or None')
+                if lower is not None and upper is not None and lower > upper:
+                    raise ValueError(f'{name} lower bounds must not exceed upper bounds')
 
         p_m = self.m*m_e
         p_q = self.q*e
@@ -120,7 +128,7 @@ class ParticlePusher:
             
             dt = self._dt_calc(B_vec,gamma,rqm)
             t_mid = t + dt/2
-            p_x, p_px = self._boris_step(p_x,p_px,rqm,dt,t_mid)
+            p_x, p_px = self._higuera_cary_step(p_x,p_px,rqm,dt,t_mid)
             t += dt
             t_list.append(t)
             p_6d_t.append(np.concatenate((p_x,p_px),axis=0))
@@ -135,66 +143,47 @@ class ParticlePusher:
         return t,p_6d_t
 
 
-    def _boris_step(self,p_x,p_px,rqm,dt,t):
+    def _higuera_cary_step(self,p_x,p_px,rqm,dt,t):
         """Advance one symmetric drift/kick/rotation/kick/drift step.
 
-        Fields are sampled at the time and position midpoint. ``boris_hc``
-        uses the Higuera–Cary implicit gamma correction for the magnetic
-        rotation; the electric half-kicks and position drifts are shared.
+        Fields are sampled at the time and position midpoint. The magnetic
+        rotation uses the Higuera–Cary gamma correction.
         """
-        # Relativistic Boris split: drift to the spatial midpoint, apply
-        # fields at the temporal and spatial midpoint, then drift to the end.
-        tem = 0.5 * dt / rqm
+        half_qmdt = 0.5 * dt / rqm
 
-        # half step move
-        g = np.tile(self._gamma_calc(p_px),(3,1))
-        p_x = p_x + p_px*c/g*dt/2
+        # Drift to the spatial midpoint using the incoming momentum.
+        gamma_n = np.tile(self._gamma_calc(p_px), (3, 1))
+        x_mid = p_x + p_px*c/gamma_n*dt/2
 
-        # get fields
-        E_vec, B_vec = self.EM_function(t,p_x)
+        # Sample fields once at the time and position midpoint.
+        E_vec, B_vec = self.EM_function(t, x_mid)
         E_vec = np.asarray(E_vec, dtype=float)
         B_vec = np.asarray(B_vec, dtype=float)
-        if E_vec.shape != p_x.shape or B_vec.shape != p_x.shape:
+        if E_vec.shape != x_mid.shape or B_vec.shape != x_mid.shape:
             raise ValueError('EM_function must return E and B arrays with shape (3, number_of_particles)')
         if not np.all(np.isfinite(E_vec)) or not np.all(np.isfinite(B_vec)):
             raise ValueError('EM_function returned non-finite field values')
 
-        # half acceleration with E
-        p = p_px +E_vec*tem/c
+        # Apply the first electric half-kick, then solve the Higuera–Cary
+        # quadratic for the gamma used in the magnetic rotation.
+        u_minus = p_px + E_vec*half_qmdt/c
+        tau = half_qmdt*B_vec
+        tau_sq = np.sum(tau**2, axis=0)
+        sigma = 1 + np.sum(u_minus**2, axis=0) - tau_sq
+        tau_dot_u = np.sum(tau*u_minus, axis=0)
+        gamma_rotation = np.sqrt(
+            0.5*(sigma + np.sqrt(sigma**2 + 4*(tau_sq + tau_dot_u**2))))
 
-        # compute inverse gamma and multiply by tem
-        g = self._gamma_calc(p)
-    
-        if self.pushMethod == 'boris_hc':
-            g2 = 1+np.sum(p**2,axis=0)
-            
-            tau = tem * B_vec
-            tau2 = np.sum(tau**2,axis=0)
-            sigma =g2 - tau2
-           
-            tau_dot_u = np.sum(tau*p,axis=0)
+        t_vec = tau/np.tile(gamma_rotation, (3, 1))
+        u_prime = u_minus + np.cross(u_minus, t_vec, axis=0)
+        s_vec = 2*t_vec/(1 + np.sum(t_vec**2, axis=0, keepdims=True))
+        u_plus = u_minus + np.cross(u_prime, s_vec, axis=0)
 
-            g = np.sqrt(0.5*(sigma + np.sqrt(sigma**2 + 4.0 * (tau2 + tau_dot_u**2))))
-
-        g_tem = np.tile(tem/g,(3,1))
-        B_vec = B_vec*g_tem
-        
-        # half rotation with B
-        pp = p + np.cross(p,B_vec,axis=0)
-    
-        # Second half rotation
-        B_vec = B_vec*2/(1+np.sum(B_vec**2, axis=0, keepdims=True))
-        p =  p + np.cross(pp,B_vec,axis=0)
-    
-        # second half acceleration
-        p = p + E_vec*tem/c
-        
-        # final half move particles
-        g = np.tile(self._gamma_calc(p),(3,1))
-        v = c*p/g
-        p_x =  p_x + v*dt/2
-        p_px = p
-        return p_x, p_px
+        # Finish the electric kick and drift to the end of the step.
+        p_next = u_plus + E_vec*half_qmdt/c
+        gamma_next = np.tile(self._gamma_calc(p_next), (3, 1))
+        x_next = x_mid + c*p_next/gamma_next*dt/2
+        return x_next, p_next
 
         
         

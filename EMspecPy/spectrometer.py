@@ -30,7 +30,7 @@ class EMspec:
         magnitude and electron mass, respectively (for example, ``q=-1,
         m=1`` for electrons).
         """
-        self.N_MeV = 1000 # number of points on electron energy axis
+        self.N_spec_points = 1000 # number of samples along each screen calibration
         self.p_6d_0 = None
         self.q = q # -1 for electrons
         self.m = m # 1 for electrons 1836.15 for protons
@@ -190,7 +190,7 @@ class EMspec:
             l = np.linalg.norm(d_e-dS['origin'])
             if l == 0:
                 raise ValueError('Screen origin and end must be different')
-            spec_x = np.linspace(0,l,num=self.N_MeV,endpoint=True)
+            spec_x = np.linspace(0,l,num=self.N_spec_points,endpoint=True)
 
             def set_nan_dispersion():
                 nan_values = np.full(spec_x.shape, np.nan, dtype=float)
@@ -376,11 +376,14 @@ class EMspec:
 
         return p_6d_0
 
-    def model_spectrometer(self,screens=None,dx=1e-3,xLims=None,N_max = 10000,pLims=None,calc_dispersion=True,show_tracks=True):
+    def model_spectrometer(self,screens=None,dx=1e-3,xLims=None,N_max=10000,pLims=None,
+                           ppc=32,calc_dispersion=True,show_tracks=True):
         """Run tracking, screen extraction, optional dispersion, and plotting.
 
         ``dx`` sets a spatially motivated upper time step using the initial
-        maximum particle speed. ``xLims`` and ``pLims`` stop integration once
+        maximum particle speed. ``ppc`` is the target number of steps per
+        relativistic gyroperiod. Strong acceleration or rapidly changing
+        fields may require a smaller ``dx``. ``xLims`` and ``pLims`` stop integration once
         every particle is outside the configured bounds or ``N_max`` pushes
         have run. Screen dictionaries require ``origin``, ``end`` and ``side``
         3-vectors; add a ``label`` for plot titles. Results are stored on this
@@ -394,13 +397,15 @@ class EMspec:
         if self.p_6d_0 is None:
             self.initialise_particles()
 
-        if dx <= 0:
-            raise ValueError('dx must be positive')
+        if not np.isfinite(dx) or dx <= 0:
+            raise ValueError('dx must be finite and positive')
         b  = np.sqrt(1-1/self.G**2)
 
         v_max = np.max(b)*c
         dt_max = dx/v_max if v_max > 0 else dx/c
-        P_tracker = pp3d.ParticlePusher(self.p_6d_0,self.EM_function,dtMin=0,dtMax=dt_max,ppc=32,q=self.q,m=self.m)
+        P_tracker = pp3d.ParticlePusher(
+            self.p_6d_0, self.EM_function, dtMin=0, dtMax=dt_max,
+            ppc=ppc, q=self.q, m=self.m)
         self.t,self.p_6d_t = P_tracker.track_particles(xLims=self.xLims,pLims=pLims,N_max=N_max)
         if show_tracks:
             self.plot_tracks()
