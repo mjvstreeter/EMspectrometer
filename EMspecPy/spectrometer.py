@@ -85,6 +85,7 @@ class EMspec:
             screen_y = []
             screen_eAng = []
             screen_g = []
+            p_6d_screen = []
             for n in range(N_p):
                 x = p_6d_t[:,0,n]
                 y = p_6d_t[:,1,n]
@@ -112,16 +113,20 @@ class EMspec:
                     screen_y.append(np.dot(p_0-d_o,d_y_vec))
                     screen_g.append(G.flatten()[n])
                     screen_eAng.append(np.arccos(np.dot(v_0,screenNormal.flatten())))
+                    p_6d_screen.append(np.append([p_0,v_0]))
                 else:
                     screen_x.append(np.nan)
                     screen_y.append(np.nan)
                     screen_g.append(np.nan)
                     screen_eAng.append(np.nan)
+                    p_6d_screen = np.array([np.nan]*6)
             screen_x = np.array(screen_x)
             screen_y = np.array(screen_y)   
             screen_g = np.array(screen_g) 
             screen_eAng = np.array(screen_eAng)
+            p_6d_screen = np.array(p_6d_screen)
 
+            dS['p_6d_screen'] = p_6d_screen
             dS['screen_x'] = screen_x
             dS['screen_y'] = screen_y
             dS['screen_g'] = screen_g
